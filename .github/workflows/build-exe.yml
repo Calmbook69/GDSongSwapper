@@ -1,47 +1,57 @@
-name: Build Windows EXE
+# .github/workflows/release.yml
+name: Build Windows
 
 on:
-  release:
-    types: [published]
   push:
     tags:
-      - 'v*'
+      - 'v*'   # e.g., v1.0.0
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
-    
+
+    permissions:
+      contents: write  # needed to create a GitHub Release
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Build EXE with PyInstaller
-      run: |
-        pyinstaller --onefile --windowed --name "GeometryDashSongSwapper" main.py
-        
-    - name: Upload EXE artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: GeometryDashSongSwapper-exe
-        path: dist/GeometryDashSongSwapper.exe
-        
-    - name: Upload to Release
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v4
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./dist/GeometryDashSongSwapper.exe
-        asset_name: GeometryDashSongSwapper.exe
-        asset_content_type: application/vnd.microsoft.portable-executable
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        shell: bash
+        run: |
+          pyinstaller --onefile --windowed --name "GeometryDashSongSwapper" main.py
+          ls -al dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GeometryDashSongSwapper-${{ github.ref_name }}-windows
+          path: dist/GeometryDashSongSwapper.exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/GeometryDashSongSwapper.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
